@@ -162,6 +162,8 @@ The installation sets up:
 
 ## Troubleshooting
 
+> **Having issues?** See the comprehensive [TROUBLESHOOTING.md](TROUBLESHOOTING.md) guide for detailed solutions.
+
 ### SSH Connection Issues
 ```bash
 # Test SSH connection
