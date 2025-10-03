@@ -42,6 +42,8 @@ Before running the installation, ensure you have:
 
 ## Quick Start
 
+> **TL;DR?** See [QUICKSTART.md](QUICKSTART.md) for a one-page quick reference.
+
 ### Option 1: Using the Installation Script (Recommended)
 
 ```bash
@@ -91,6 +93,20 @@ Customize installation by modifying variables in the playbook:
 - `postgres_password`: PostgreSQL password (change this!)
 
 ## Post-Installation
+
+### Verifying the Installation
+
+Run the verification script to check if all services are running:
+
+```bash
+./verify.sh
+```
+
+This will check:
+- SSH connectivity
+- SonarQube service status and HTTP endpoint
+- Sentry Docker containers and HTTP endpoint
+- PostgreSQL and Redis services
 
 ### Accessing the Services
 
