@@ -1,0 +1,27 @@
+---
+# Configuration file for SonarQube and Sentry installation
+# Edit these values to customize your installation
+
+target:
+  ip: 10.20.1.2
+  user: user1
+  ssh_key: ~/.ssh/id_rsa
+
+sonarqube:
+  version: "9.9.0.65466"
+  port: 9000
+  install_path: /opt/sonarqube
+  
+sentry:
+  port: 9001
+  install_path: /opt/sentry
+
+database:
+  # IMPORTANT: Change this password!
+  postgres_password: changeme
+
+# System requirements check thresholds
+system_requirements:
+  min_ram_gb: 4
+  recommended_ram_gb: 8
+  min_disk_gb: 20
