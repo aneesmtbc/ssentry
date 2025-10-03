@@ -1,0 +1,185 @@
+---
+- name: Install SonarQube and Sentry
+  hosts: sonar_sentry_server
+  become: yes
+  
+  vars:
+    sonarqube_version: "9.9.0.65466"
+    sonarqube_download_url: "https://binaries.sonarsource.com/Distribution/sonarqube/sonarqube-{{ sonarqube_version }}.zip"
+    sonarqube_home: "/opt/sonarqube"
+    sonarqube_port: 9000
+    
+    sentry_port: 9001
+    sentry_home: "/opt/sentry"
+    
+    postgres_password: "changeme"
+    redis_port: 6379
+  
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+      
+    - name: Install required packages
+      apt:
+        name:
+          - default-jdk
+          - unzip
+          - wget
+          - curl
+          - postgresql
+          - postgresql-contrib
+          - redis-server
+          - python3
+          - python3-pip
+          - python3-venv
+          - docker.io
+          - docker-compose
+        state: present
+    
+    # SonarQube Installation
+    - name: Create SonarQube user
+      user:
+        name: sonarqube
+        system: yes
+        shell: /bin/bash
+        home: "{{ sonarqube_home }}"
+        createhome: no
+    
+    - name: Create SonarQube directory
+      file:
+        path: "{{ sonarqube_home }}"
+        state: directory
+        owner: sonarqube
+        group: sonarqube
+        mode: '0755'
+    
+    - name: Download SonarQube
+      get_url:
+        url: "{{ sonarqube_download_url }}"
+        dest: "/tmp/sonarqube.zip"
+        mode: '0644'
+    
+    - name: Extract SonarQube
+      unarchive:
+        src: "/tmp/sonarqube.zip"
+        dest: "{{ sonarqube_home }}"
+        remote_src: yes
+        extra_opts: [--strip-components=1]
+        owner: sonarqube
+        group: sonarqube
+    
+    - name: Configure PostgreSQL for SonarQube
+      postgresql_db:
+        name: sonarqube
+        state: present
+      become_user: postgres
+    
+    - name: Create PostgreSQL user for SonarQube
+      postgresql_user:
+        name: sonarqube
+        password: "{{ postgres_password }}"
+        db: sonarqube
+        priv: ALL
+        state: present
+      become_user: postgres
+    
+    - name: Configure SonarQube properties
+      lineinfile:
+        path: "{{ sonarqube_home }}/conf/sonar.properties"
+        regexp: "{{ item.regexp }}"
+        line: "{{ item.line }}"
+        create: yes
+      loop:
+        - { regexp: '^#?sonar.jdbc.username=', line: 'sonar.jdbc.username=sonarqube' }
+        - { regexp: '^#?sonar.jdbc.password=', line: 'sonar.jdbc.password={{ postgres_password }}' }
+        - { regexp: '^#?sonar.jdbc.url=', line: 'sonar.jdbc.url=jdbc:postgresql://localhost/sonarqube' }
+        - { regexp: '^#?sonar.web.port=', line: 'sonar.web.port={{ sonarqube_port }}' }
+    
+    - name: Create SonarQube systemd service
+      copy:
+        dest: /etc/systemd/system/sonarqube.service
+        content: |
+          [Unit]
+          Description=SonarQube service
+          After=syslog.target network.target
+          
+          [Service]
+          Type=forking
+          ExecStart={{ sonarqube_home }}/bin/linux-x86-64/sonar.sh start
+          ExecStop={{ sonarqube_home }}/bin/linux-x86-64/sonar.sh stop
+          User=sonarqube
+          Group=sonarqube
+          Restart=always
+          LimitNOFILE=65536
+          LimitNPROC=4096
+          
+          [Install]
+          WantedBy=multi-user.target
+    
+    - name: Set ownership for SonarQube directory
+      file:
+        path: "{{ sonarqube_home }}"
+        owner: sonarqube
+        group: sonarqube
+        recurse: yes
+    
+    - name: Enable and start SonarQube service
+      systemd:
+        name: sonarqube
+        enabled: yes
+        state: started
+        daemon_reload: yes
+    
+    # Sentry Installation
+    - name: Create Sentry directory
+      file:
+        path: "{{ sentry_home }}"
+        state: directory
+        mode: '0755'
+    
+    - name: Clone Sentry self-hosted repository
+      git:
+        repo: 'https://github.com/getsentry/self-hosted.git'
+        dest: "{{ sentry_home }}"
+        version: master
+        force: yes
+    
+    - name: Create Sentry environment file
+      copy:
+        dest: "{{ sentry_home }}/.env"
+        content: |
+          SENTRY_BIND=0.0.0.0
+          SENTRY_PORT={{ sentry_port }}
+          SENTRY_SECRET_KEY={{ lookup('password', '/dev/null length=50 chars=ascii_letters,digits') }}
+    
+    - name: Run Sentry install script
+      shell: |
+        cd {{ sentry_home }}
+        ./install.sh --skip-user-prompt
+      args:
+        creates: "{{ sentry_home }}/docker-compose.yml"
+      environment:
+        REPORT_SELF_HOSTED_ISSUES: "0"
+    
+    - name: Start Sentry with docker-compose
+      shell: |
+        cd {{ sentry_home }}
+        docker-compose up -d
+      args:
+        chdir: "{{ sentry_home }}"
+    
+    - name: Display installation information
+      debug:
+        msg:
+          - "SonarQube installation completed!"
+          - "SonarQube URL: http://10.20.1.2:{{ sonarqube_port }}"
+          - "Default credentials: admin/admin"
+          - ""
+          - "Sentry installation completed!"
+          - "Sentry URL: http://10.20.1.2:{{ sentry_port }}"
+          - "Please check the Sentry logs for initial admin credentials"
+          - ""
+          - "PostgreSQL password: {{ postgres_password }}"
+          - "IMPORTANT: Change default passwords after first login!"

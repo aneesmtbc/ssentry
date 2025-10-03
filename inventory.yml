@@ -1,0 +1,9 @@
+---
+all:
+  hosts:
+    sonar_sentry_server:
+      ansible_host: 10.20.1.2
+      ansible_user: user1
+      ansible_ssh_private_key_file: ~/.ssh/id_rsa
+      ansible_become: yes
+      ansible_become_method: sudo
