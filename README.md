@@ -153,6 +153,8 @@ docker-compose logs -f
 
 ## Architecture
 
+> **Want to understand the system design?** See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed architecture diagrams and component information.
+
 The installation sets up:
 
 1. **PostgreSQL** - Database for SonarQube
